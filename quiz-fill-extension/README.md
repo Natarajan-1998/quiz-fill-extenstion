@@ -145,6 +145,6 @@ quiz-fill-extension/
 | 3 | Background service worker — LLM router | ✅ Done |
 | 4 | Content script — DOM question extractor | ✅ Done |
 | 5 | Content script — answer injector + badges | ✅ Done |
-| 6 | Resource manager — text, files, URLs | 🔲 Pending |
+| 6 | Resource manager — text, files, URLs | ✅ Done |
 | 7 | Popup UI — full fill flow & state machine | 🔲 Pending |
 | 8 | Packaging & cross-browser verification | 🔲 Pending |

@@ -1,5 +1,5 @@
 /**
- * Background Service Worker — Tasks 1, 2 & 3
+ * Background Service Worker — Tasks 1, 2, 3 & 6
  *
  * Central message hub. Only the service worker can make cross-origin fetch()
  * calls to OpenAI / Gemini (via host_permissions in the manifest).
@@ -7,17 +7,74 @@
  * Handlers:
  *  - Task 2: TEST_CONNECTION — make a minimal API call to validate the key
  *  - Task 3: AI_COMPLETE     — route questions to OpenAI or Gemini, return answers
- *  - Task 6: FETCH_URL       — fetch a user-provided URL (pending)
+ *  - Task 6: FETCH_URL       — fetch a user-provided URL and return its text
  */
 
 import browser from "webextension-polyfill";
 import {
   MessageType,
   type AiCompletePayload,
+  type FetchUrlPayload,
+  type FetchUrlResult,
   type TestConnectionPayload,
   type TestConnectionResult,
 } from "../lib/types.js";
 import { handleAiComplete } from "../lib/llm/router.js";
+
+// ---------------------------------------------------------------------------
+// FETCH_URL — fetch a user-provided URL and return its raw text/HTML
+// ---------------------------------------------------------------------------
+
+async function handleFetchUrl(payload: FetchUrlPayload): Promise<FetchUrlResult> {
+  const { url } = payload;
+
+  if (!url) {
+    return { success: false, error: "No URL provided." };
+  }
+
+  // Basic URL validation
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(url);
+  } catch {
+    return { success: false, error: `Invalid URL: "${url}"` };
+  }
+
+  if (parsedUrl.protocol !== "https:" && parsedUrl.protocol !== "http:") {
+    return { success: false, error: "Only http:// and https:// URLs are supported." };
+  }
+
+  try {
+    const res = await fetch(url, {
+      method: "GET",
+      headers: {
+        // Identify ourselves as a browser-like client to avoid bot blocks
+        "Accept": "text/html,application/xhtml+xml,text/plain,*/*",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+      // Respect redirects up to the browser default limit
+      redirect: "follow",
+    });
+
+    if (!res.ok) {
+      return {
+        success: false,
+        error: `Server returned ${res.status} ${res.statusText} for ${url}`,
+      };
+    }
+
+    // Read as text — the popup will strip HTML tags with stripHtml()
+    const text = await res.text();
+
+    // Cap at 200 KB to avoid overwhelming the LLM context window
+    const capped = text.slice(0, 200_000);
+
+    return { success: true, text: capped };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: `Fetch failed: ${msg}` };
+  }
+}
 
 // ---------------------------------------------------------------------------
 // TEST_CONNECTION — validate the user-supplied API key
@@ -151,10 +208,11 @@ export default defineBackground(() => {
           return true; // keep channel open for async response
         }
 
-        case MessageType.FETCH_URL:
-          // Implemented in Task 6
-          sendResponse({ success: false, error: "FETCH_URL not yet implemented." });
-          break;
+        case MessageType.FETCH_URL: {
+          const payload = message as unknown as FetchUrlPayload & { type: MessageType };
+          handleFetchUrl(payload).then(sendResponse);
+          return true; // keep channel open for async response
+        }
 
         default:
           sendResponse({ success: false, error: `Unknown message type: ${message.type}` });
