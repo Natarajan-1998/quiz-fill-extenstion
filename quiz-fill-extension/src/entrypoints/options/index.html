@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QuizFill — Settings</title>
+    <style>
+      /* ── Kiro design tokens (inlined — no external import needed) ───── */
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
+      :root {
+        --kiro-purple-900: #2e1065;
+        --kiro-purple-700: #6b21a8;
+        --kiro-purple-600: #7c3aed;
+        --kiro-purple-500: #8b5cf6;
+        --kiro-purple-400: #a78bfa;
+        --kiro-purple-300: #c4b5fd;
+        --kiro-orange-500: #f97316;
+        --kiro-orange-400: #fb923c;
+        --kiro-orange-200: #fed7aa;
+        --kiro-bg:         #0f0a1a;
+        --kiro-surface-1:  #1a1030;
+        --kiro-surface-2:  #251843;
+        --kiro-surface-3:  #2f2060;
+        --kiro-border:     #3d2b7a;
+        --kiro-border-dim: #2a1f55;
+        --kiro-text:       #f1eeff;
+        --kiro-text-muted: #a89ec4;
+        --kiro-text-dim:   #6b5f8a;
+        --kiro-success:    #22c55e;
+        --kiro-warn:       #f59e0b;
+        --kiro-error:      #ef4444;
+        --kiro-font: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+        --kiro-font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+        --kiro-radius:    8px;
+        --kiro-radius-lg: 12px;
+        --tx: 0.15s ease;
+      }
+
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+      body {
+        font-family: var(--kiro-font);
+        font-size: 14px;
+        color: var(--kiro-text);
+        background: var(--kiro-bg);
+        min-height: 100vh;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ── Top bar ─────────────────────────────────────────────────────── */
+      .topbar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 0 32px;
+        height: 56px;
+        background: linear-gradient(135deg, #3b0764, #6b21a8);
+        border-top: 3px solid var(--kiro-orange-500);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+
+      .topbar-logo {
+        display: flex; align-items: center; gap: 9px;
+        text-decoration: none;
+      }
+      .topbar-logo-icon {
+        width: 28px; height: 28px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 7px;
+        display: flex; align-items: center; justify-content: center;
+      }
+      .topbar-logo h1 {
+        font-size: 16px;
+        font-weight: 700;
+        color: #fff;
+      }
+      .topbar-logo span {
+        font-size: 12px;
+        color: rgba(255,255,255,0.55);
+        font-weight: 400;
+        margin-left: 4px;
+      }
+
+      /* ── Layout ──────────────────────────────────────────────────────── */
+      .page {
+        max-width: 600px;
+        margin: 36px auto;
+        padding: 0 24px 60px;
+      }
+
+      .page-title {
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--kiro-text);
+        margin-bottom: 4px;
+      }
+      .page-subtitle {
+        font-size: 13px;
+        color: var(--kiro-text-muted);
+        margin-bottom: 32px;
+        line-height: 1.5;
+      }
+
+      /* ── Settings card ───────────────────────────────────────────────── */
+      .settings-card {
+        background: var(--kiro-surface-1);
+        border: 1px solid var(--kiro-border);
+        border-radius: var(--kiro-radius-lg);
+        overflow: hidden;
+        margin-bottom: 20px;
+      }
+
+      .card-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--kiro-border-dim);
+      }
+      .card-header-icon {
+        width: 32px; height: 32px;
+        background: rgba(107,33,168,0.25);
+        border-radius: 8px;
+        display: flex; align-items: center; justify-content: center;
+        color: var(--kiro-purple-400);
+        flex-shrink: 0;
+      }
+      .card-header-text h2 {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--kiro-text);
+      }
+      .card-header-text p {
+        font-size: 11px;
+        color: var(--kiro-text-muted);
+        margin-top: 2px;
+      }
+
+      .card-body { padding: 20px; }
+
+      /* ── Form elements ───────────────────────────────────────────────── */
+      .form-group { margin-bottom: 20px; }
+      .form-group:last-child { margin-bottom: 0; }
+
+      .form-label {
+        display: block;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--kiro-purple-300);
+        margin-bottom: 7px;
+      }
+
+      .form-input,
+      .form-select {
+        width: 100%;
+        padding: 9px 12px;
+        background: var(--kiro-bg);
+        border: 1px solid var(--kiro-border);
+        border-radius: var(--kiro-radius);
+        color: var(--kiro-text);
+        font-family: var(--kiro-font);
+        font-size: 13px;
+        outline: none;
+        transition: border-color var(--tx), box-shadow var(--tx);
+        appearance: none;
+        -webkit-appearance: none;
+      }
+      .form-input:focus,
+      .form-select:focus {
+        border-color: var(--kiro-purple-500);
+        box-shadow: 0 0 0 3px rgba(139,92,246,0.22);
+      }
+      .form-input::placeholder { color: var(--kiro-text-dim); }
+
+      /* Password field wrapper */
+      .input-wrap { position: relative; }
+      .input-wrap .form-input { padding-right: 42px; }
+      .toggle-vis {
+        position: absolute;
+        right: 11px; top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: var(--kiro-text-dim);
+        cursor: pointer;
+        padding: 2px;
+        display: flex; align-items: center;
+        transition: color var(--tx);
+      }
+      .toggle-vis:hover { color: var(--kiro-purple-400); }
+
+      /* Select arrow */
+      .select-wrap { position: relative; }
+      .select-wrap::after {
+        content: "";
+        position: absolute;
+        right: 12px; top: 50%;
+        transform: translateY(-50%);
+        width: 0; height: 0;
+        border-left: 5px solid transparent;
+        border-right: 5px solid transparent;
+        border-top: 6px solid var(--kiro-purple-400);
+        pointer-events: none;
+      }
+      .form-select option { background: var(--kiro-surface-1); }
+
+      .form-hint {
+        margin-top: 5px;
+        font-size: 11px;
+        color: var(--kiro-text-dim);
+        line-height: 1.5;
+      }
+      .form-hint a {
+        color: var(--kiro-orange-400);
+        text-decoration: none;
+      }
+      .form-hint a:hover { text-decoration: underline; }
+
+      .form-error {
+        display: none;
+        margin-top: 5px;
+        font-size: 11px;
+        color: #fca5a5;
+      }
+      .form-error.visible { display: block; }
+
+      /* ── Inline model selector row ───────────────────────────────────── */
+      .row-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+
+      /* ── Action row ──────────────────────────────────────────────────── */
+      .action-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 24px;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        display: inline-flex; align-items: center; gap: 7px;
+        padding: 9px 20px;
+        border-radius: var(--kiro-radius);
+        font-family: var(--kiro-font);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        transition: opacity var(--tx), transform var(--tx), box-shadow var(--tx), background var(--tx);
+        white-space: nowrap;
+      }
+      .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+      .btn-primary {
+        background: linear-gradient(135deg, var(--kiro-purple-700), var(--kiro-purple-600));
+        color: #fff;
+        box-shadow: 0 2px 10px rgba(107,33,168,0.45);
+      }
+      .btn-primary:hover:not(:disabled) {
+        opacity: 0.88;
+        box-shadow: 0 4px 16px rgba(107,33,168,0.6);
+      }
+      .btn-primary:active:not(:disabled) { transform: scale(0.97); }
+
+      .btn-outline {
+        background: transparent;
+        color: var(--kiro-purple-400);
+        border: 1px solid var(--kiro-border);
+      }
+      .btn-outline:hover:not(:disabled) { background: var(--kiro-surface-2); }
+
+      /* ── Toast / feedback strip ──────────────────────────────────────── */
+      #toast {
+        display: none;
+        margin-top: 16px;
+        padding: 10px 14px;
+        border-radius: var(--kiro-radius);
+        font-size: 12px;
+        line-height: 1.5;
+        align-items: center;
+        gap: 9px;
+      }
+      #toast.visible { display: flex; }
+
+      #toast.success {
+        background: rgba(34,197,94,0.1);
+        border: 1px solid rgba(34,197,94,0.3);
+        color: #86efac;
+      }
+      #toast.error {
+        background: rgba(239,68,68,0.1);
+        border: 1px solid rgba(239,68,68,0.3);
+        color: #fca5a5;
+      }
+      #toast.loading {
+        background: rgba(139,92,246,0.1);
+        border: 1px solid rgba(139,92,246,0.3);
+        color: var(--kiro-purple-300);
+      }
+
+      .spinner {
+        width: 14px; height: 14px;
+        border: 2px solid rgba(139,92,246,0.3);
+        border-top-color: var(--kiro-purple-400);
+        border-radius: 50%;
+        animation: spin 0.65s linear infinite;
+        flex-shrink: 0;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      /* ── Saved badge (top-right of card) ─────────────────────────────── */
+      .saved-badge {
+        display: none;
+        margin-left: auto;
+        font-size: 11px;
+        font-weight: 600;
+        color: #86efac;
+        background: rgba(34,197,94,0.12);
+        border: 1px solid rgba(34,197,94,0.3);
+        padding: 2px 10px;
+        border-radius: 999px;
+        align-items: center;
+        gap: 5px;
+      }
+      .saved-badge.visible { display: flex; }
+
+      /* ── API-key guide link strip ─────────────────────────────────────── */
+      .key-guide {
+        margin-top: 24px;
+        padding: 14px 16px;
+        background: rgba(249,115,22,0.07);
+        border: 1px solid rgba(249,115,22,0.2);
+        border-radius: var(--kiro-radius);
+        font-size: 12px;
+        color: var(--kiro-orange-200);
+        line-height: 1.6;
+      }
+      .key-guide strong { color: var(--kiro-orange-400); }
+      .key-guide a { color: var(--kiro-orange-400); text-decoration: none; }
+      .key-guide a:hover { text-decoration: underline; }
+      .key-guide ul { margin: 6px 0 0 16px; }
+      .key-guide li { margin-bottom: 3px; }
+
+      /* ── Divider ─────────────────────────────────────────────────────── */
+      .divider {
+        height: 1px;
+        background: var(--kiro-border-dim);
+        margin: 20px 0;
+      }
+
+      /* ── Danger zone ─────────────────────────────────────────────────── */
+      #clear-data-btn {
+        background: transparent;
+        border: 1px solid rgba(239,68,68,0.35);
+        color: #fca5a5;
+        font-family: var(--kiro-font);
+        font-size: 12px;
+        font-weight: 600;
+        padding: 7px 16px;
+        border-radius: var(--kiro-radius);
+        cursor: pointer;
+        transition: background var(--tx);
+      }
+      #clear-data-btn:hover { background: rgba(239,68,68,0.1); }
+    </style>
+  </head>
+  <body>
+    <!-- ── Sticky top bar ───────────────────────────────── -->
+    <div class="topbar">
+      <div class="topbar-logo">
+        <div class="topbar-logo-icon">
+          <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+            <path d="M3 5h9M3 9h6M3 13h8" stroke="#c4b5fd" stroke-width="1.6" stroke-linecap="round"/>
+            <circle cx="15" cy="13" r="4" fill="none" stroke="#f97316" stroke-width="1.5"/>
+            <path d="M13.5 13l1 1 2-2" stroke="#f97316" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h1>QuizFill <span>Settings</span></h1>
+      </div>
+    </div>
+
+    <!-- ── Page content ─────────────────────────────────── -->
+    <div class="page">
+      <h2 class="page-title">LLM Provider Settings</h2>
+      <p class="page-subtitle">
+        Configure which AI model powers QuizFill. Your API key is stored locally
+        in your browser and never sent to any server other than the AI provider you choose.
+      </p>
+
+      <!-- ── Main settings card ──────────────────────────── -->
+      <div class="settings-card">
+        <div class="card-header">
+          <div class="card-header-icon">
+            <!-- key icon -->
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="8" cy="8" r="4"/>
+              <path d="M20 20L11.42 11.42M15 15l3 3-2 2M17 13l2 2"/>
+            </svg>
+          </div>
+          <div class="card-header-text">
+            <h2>API Configuration</h2>
+            <p>Provider, model, and secret key</p>
+          </div>
+          <span class="saved-badge" id="saved-badge">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 6 9 17l-5-5"/>
+            </svg>
+            Saved
+          </span>
+        </div>
+
+        <div class="card-body">
+
+          <!-- Provider ───────────────────────────────────── -->
+          <div class="form-group">
+            <label class="form-label" for="provider-select">AI Provider</label>
+            <div class="select-wrap">
+              <select class="form-select" id="provider-select">
+                <option value="openai">OpenAI (GPT-4o)</option>
+                <option value="gemini">Google Gemini</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Model ──────────────────────────────────────── -->
+          <div class="form-group">
+            <label class="form-label" for="model-select">Model</label>
+            <div class="select-wrap">
+              <select class="form-select" id="model-select">
+                <!-- Populated dynamically from JS based on provider selection -->
+              </select>
+            </div>
+            <p class="form-hint" id="model-hint"></p>
+          </div>
+
+          <!-- API Key ─────────────────────────────────────── -->
+          <div class="form-group">
+            <label class="form-label" for="api-key-input">API Key</label>
+            <div class="input-wrap">
+              <input
+                type="password"
+                class="form-input"
+                id="api-key-input"
+                placeholder="Paste your API key here…"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button class="toggle-vis" id="toggle-key-vis" type="button" title="Show / hide key">
+                <!-- eye icon (show) -->
+                <svg id="eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+                <!-- eye-off icon (hide) — hidden initially -->
+                <svg id="eye-closed" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     style="display:none">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19M1 1l22 22"/>
+                </svg>
+              </button>
+            </div>
+            <p class="form-hint" id="key-hint"></p>
+            <p class="form-error" id="key-error">API key is required.</p>
+          </div>
+
+          <!-- Action row ──────────────────────────────────── -->
+          <div class="action-row">
+            <button class="btn btn-primary" id="save-btn">
+              <!-- save icon -->
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                <polyline points="17 21 17 13 7 13 7 21"/>
+                <polyline points="7 3 7 8 15 8"/>
+              </svg>
+              Save Settings
+            </button>
+
+            <button class="btn btn-outline" id="test-btn">
+              <!-- zap icon -->
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+              </svg>
+              Test Connection
+            </button>
+          </div>
+
+          <!-- Toast feedback ──────────────────────────────── -->
+          <div id="toast">
+            <div class="spinner" id="toast-spinner" style="display:none"></div>
+            <span id="toast-text"></span>
+          </div>
+
+        </div><!-- /card-body -->
+      </div><!-- /settings-card -->
+
+      <!-- ── API key guide ────────────────────────────────── -->
+      <div class="key-guide">
+        <strong>How to get your API key</strong>
+        <ul>
+          <li>
+            <strong>OpenAI:</strong> Visit
+            <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a>
+            → Create new secret key. Keys start with <code style="color:var(--kiro-orange-400)">sk-</code>.
+          </li>
+          <li>
+            <strong>Google Gemini:</strong> Visit
+            <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a>
+            → Get API key → Create API key.
+          </li>
+        </ul>
+      </div>
+
+      <!-- ── Danger zone ───────────────────────────────────── -->
+      <div class="divider"></div>
+      <button id="clear-data-btn">🗑 Clear all saved settings</button>
+
+    </div><!-- /page -->
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

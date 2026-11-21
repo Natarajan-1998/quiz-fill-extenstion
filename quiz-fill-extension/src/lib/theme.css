@@ -1,0 +1,293 @@
+/*
+ * QuizFill — Kiro-inspired design tokens
+ *
+ * Colour palette mirrors Kiro IDE:
+ *   Primary  : deep purple  (#6B21A8 → #7C3AED)
+ *   Surface  : near-black   (#0F0A1A) with mid-dark panels (#1A1030)
+ *   Accent   : orange       (#F97316 → #FB923C)
+ *   Success  : green        (#22C55E)
+ *   Warning  : amber        (#F59E0B)
+ *   Danger   : red          (#EF4444)
+ *   Text     : white / muted lavender
+ *
+ * Import this file into any entrypoint that needs consistent styling.
+ */
+
+:root {
+  /* ── Purple palette ────────────────────────────────────── */
+  --kiro-purple-900: #2e1065;
+  --kiro-purple-800: #3b0764;
+  --kiro-purple-700: #6b21a8;
+  --kiro-purple-600: #7c3aed;
+  --kiro-purple-500: #8b5cf6;
+  --kiro-purple-400: #a78bfa;
+  --kiro-purple-300: #c4b5fd;
+  --kiro-purple-100: #ede9fe;
+  --kiro-purple-50:  #f5f3ff;
+
+  /* ── Orange accent ──────────────────────────────────────── */
+  --kiro-orange-600: #ea580c;
+  --kiro-orange-500: #f97316;
+  --kiro-orange-400: #fb923c;
+  --kiro-orange-200: #fed7aa;
+  --kiro-orange-50:  #fff7ed;
+
+  /* ── Dark surface ───────────────────────────────────────── */
+  --kiro-bg:         #0f0a1a;   /* page / popup background     */
+  --kiro-surface-1:  #1a1030;   /* card / panel background     */
+  --kiro-surface-2:  #251843;   /* elevated / hover surface    */
+  --kiro-surface-3:  #2f2060;   /* active / pressed surface    */
+  --kiro-border:     #3d2b7a;   /* default border              */
+  --kiro-border-dim: #2a1f55;   /* subtler border              */
+
+  /* ── Text ───────────────────────────────────────────────── */
+  --kiro-text:       #f1eeff;   /* primary text (near-white)   */
+  --kiro-text-muted: #a89ec4;   /* secondary / placeholder     */
+  --kiro-text-dim:   #6b5f8a;   /* disabled / hints            */
+
+  /* ── Semantic ───────────────────────────────────────────── */
+  --kiro-success:    #22c55e;
+  --kiro-success-bg: #052e16;
+  --kiro-warn:       #f59e0b;
+  --kiro-warn-bg:    #1c1200;
+  --kiro-error:      #ef4444;
+  --kiro-error-bg:   #1f0a0a;
+
+  /* ── Gradient shortcuts ─────────────────────────────────── */
+  --kiro-grad-h: linear-gradient(135deg, var(--kiro-purple-700), var(--kiro-purple-600));
+  --kiro-grad-v: linear-gradient(180deg, var(--kiro-purple-700), var(--kiro-purple-900));
+
+  /* ── Typography ─────────────────────────────────────────── */
+  --kiro-font: "Inter", ui-sans-serif, system-ui, -apple-system,
+               BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+               sans-serif;
+  --kiro-font-mono: "JetBrains Mono", "Fira Code", ui-monospace,
+                    SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* ── Radii ───────────────────────────────────────────────── */
+  --kiro-radius-sm: 5px;
+  --kiro-radius:    8px;
+  --kiro-radius-lg: 12px;
+
+  /* ── Transitions ────────────────────────────────────────── */
+  --kiro-tx: 0.15s ease;
+}
+
+/* Google Fonts — Inter (best effort; falls back to system sans if offline) */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
+/* ── Global reset ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--kiro-font);
+  font-size: 14px;
+  color: var(--kiro-text);
+  background: var(--kiro-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Shared component classes ─────────────────────────────── */
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border: none;
+  border-radius: var(--kiro-radius);
+  font-family: var(--kiro-font);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity var(--kiro-tx), transform var(--kiro-tx),
+              background var(--kiro-tx), box-shadow var(--kiro-tx);
+  white-space: nowrap;
+}
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.btn-primary {
+  background: var(--kiro-grad-h);
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(107,33,168,0.45);
+}
+.btn-primary:hover:not(:disabled) {
+  opacity: 0.88;
+  box-shadow: 0 4px 16px rgba(107,33,168,0.6);
+}
+.btn-primary:active:not(:disabled) { transform: scale(0.97); }
+
+.btn-outline {
+  background: transparent;
+  color: var(--kiro-purple-400);
+  border: 1px solid var(--kiro-border);
+}
+.btn-outline:hover:not(:disabled) { background: var(--kiro-surface-2); }
+
+.btn-ghost {
+  background: rgba(255,255,255,0.08);
+  color: var(--kiro-text);
+  border: none;
+}
+.btn-ghost:hover:not(:disabled) { background: rgba(255,255,255,0.14); }
+
+.btn-danger {
+  background: rgba(239,68,68,0.15);
+  color: var(--kiro-error);
+  border: 1px solid rgba(239,68,68,0.3);
+}
+.btn-danger:hover:not(:disabled) { background: rgba(239,68,68,0.25); }
+
+/* Full-width helper */
+.btn-full { width: 100%; }
+
+/* Form elements */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+
+.form-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--kiro-purple-300);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.form-input,
+.form-select {
+  width: 100%;
+  padding: 9px 12px;
+  background: var(--kiro-surface-1);
+  border: 1px solid var(--kiro-border);
+  border-radius: var(--kiro-radius);
+  color: var(--kiro-text);
+  font-family: var(--kiro-font);
+  font-size: 13px;
+  outline: none;
+  transition: border-color var(--kiro-tx), box-shadow var(--kiro-tx);
+  appearance: none;
+}
+.form-input:focus,
+.form-select:focus {
+  border-color: var(--kiro-purple-500);
+  box-shadow: 0 0 0 3px rgba(139,92,246,0.25);
+}
+.form-input::placeholder { color: var(--kiro-text-dim); }
+
+.form-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a78bfa' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 32px;
+  cursor: pointer;
+}
+.form-select option { background: var(--kiro-surface-1); color: var(--kiro-text); }
+
+.form-hint {
+  font-size: 11px;
+  color: var(--kiro-text-dim);
+  line-height: 1.4;
+}
+
+.form-error {
+  font-size: 11px;
+  color: var(--kiro-error);
+  display: none;
+}
+.form-error.visible { display: block; }
+
+/* Divider */
+.divider {
+  height: 1px;
+  background: var(--kiro-border-dim);
+  margin: 20px 0;
+}
+
+/* Section header */
+.section-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--kiro-purple-400);
+  margin-bottom: 14px;
+}
+
+/* Alert / banner */
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 14px;
+  border-radius: var(--kiro-radius);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.alert-warn {
+  background: var(--kiro-warn-bg);
+  border: 1px solid rgba(245,158,11,0.35);
+  color: #fcd34d;
+}
+.alert-error {
+  background: var(--kiro-error-bg);
+  border: 1px solid rgba(239,68,68,0.35);
+  color: #fca5a5;
+}
+.alert-success {
+  background: var(--kiro-success-bg);
+  border: 1px solid rgba(34,197,94,0.35);
+  color: #86efac;
+}
+.alert a {
+  color: var(--kiro-orange-400);
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Spinner */
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid var(--kiro-surface-3);
+  border-top-color: var(--kiro-purple-500);
+  border-radius: 50%;
+  animation: kiro-spin 0.65s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes kiro-spin { to { transform: rotate(360deg); } }
+
+/* Card */
+.card {
+  background: var(--kiro-surface-1);
+  border: 1px solid var(--kiro-border);
+  border-radius: var(--kiro-radius-lg);
+  padding: 16px;
+}
+
+/* Tag / pill */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.pill-purple { background: rgba(139,92,246,0.18); color: var(--kiro-purple-300); }
+.pill-orange { background: rgba(249,115,22,0.18); color: var(--kiro-orange-400); }
+.pill-green  { background: rgba(34,197,94,0.18);  color: #86efac; }
+.pill-amber  { background: rgba(245,158,11,0.18); color: #fcd34d; }
+.pill-red    { background: rgba(239,68,68,0.18);  color: #fca5a5; }
+
+/* Orange accent line (decorative top border) */
+.accent-top {
+  border-top: 2px solid var(--kiro-orange-500);
+  border-radius: var(--kiro-radius-lg) var(--kiro-radius-lg) 0 0;
+}
