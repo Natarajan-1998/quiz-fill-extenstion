@@ -1,17 +1,17 @@
 /**
- * Content Script — Tasks 4 & 5 (Task 4 implemented here)
+ * Content Script — Tasks 4 & 5
  *
  * Zero passive behaviour: nothing happens until the user clicks the toolbar
  * button, which sends a FILL_PAGE message from the popup.
  *
- * Task 4 flow:
+ * Full flow:
  *   FILL_PAGE received
- *     → extractQuestions()   — scan the DOM for all fillable fields
- *     → AI_COMPLETE message  — send questions + resourceContext to background
- *     → receive AnswerResult[] back from the LLM router
- *     → (Task 5) injectAnswers() — fill the DOM and show confidence badges
- *
- * Task 5 wiring will replace the stub at the bottom of this file.
+ *     → extractQuestions()     — scan the DOM for all fillable fields
+ *     → AI_COMPLETE message    — send questions + resourceContext to background
+ *     → receive AnswerResult[] — structured answers from the LLM
+ *     → injectAnswers()        — fill DOM fields via MAIN-world script injection
+ *     → renderBadges()         — place confidence badges next to each filled field
+ *     → return FillSummary     — reported back to the popup
  */
 
 import browser from "webextension-polyfill";
@@ -23,6 +23,8 @@ import {
   type FillSummary,
 } from "../lib/types.js";
 import { extractQuestions } from "../lib/extractor.js";
+import { buildInjectorScript, buildInjectorPayload } from "../lib/injector.js";
+import { renderBadges, clearBadges } from "../lib/badge.js";
 
 // ---------------------------------------------------------------------------
 // Content script registration
@@ -60,8 +62,11 @@ async function handleFillPage(resourceContext?: string): Promise<{
   summary?: FillSummary;
   error?: string;
 }> {
-  // ── Step 1: Extract questions ────────────────���─────────────────────────
-  let questions;
+  // Clear any badges left by a previous fill run
+  clearBadges();
+
+  // ── Step 1: Extract questions ──────────────────────────────────────────
+  let questions: ReturnType<typeof extractQuestions>;
   try {
     questions = extractQuestions();
   } catch (err: unknown) {
@@ -76,10 +81,7 @@ async function handleFillPage(resourceContext?: string): Promise<{
   );
 
   if (questions.length === 0) {
-    return {
-      success: false,
-      error: "No fillable fields detected on this page.",
-    };
+    return { success: false, error: "No fillable fields detected on this page." };
   }
 
   // ── Step 2: Send to background worker for LLM completion ──────────────
@@ -107,35 +109,84 @@ async function handleFillPage(resourceContext?: string): Promise<{
     answers.map((a) => `[${a.fieldId}] "${a.answer}" (${Math.round(a.confidence * 100)}%)`)
   );
 
-  // ── Step 3: Inject answers into the DOM (Task 5) ──────────────────────
-  const fillResult = await injectAnswers(answers);
+  // ── Step 3: Inject answers + render confidence badges ─────────────────
+  const fillResult = await injectAnswers(answers, questions);
 
   // ── Step 4: Build and return summary ──────────────────────────────────
-  const summary: FillSummary = buildSummary(answers, fillResult.errors);
-
-  return { success: true, summary };
+  return { success: true, summary: buildSummary(answers, fillResult.errors) };
 }
 
 // ---------------------------------------------------------------------------
-// Answer injector — Task 5 stub
-// (Full MAIN-world injection implemented in Task 5)
+// Answer injector — Task 5 (full implementation)
 // ---------------------------------------------------------------------------
 
+/**
+ * Two-step process:
+ *  1. chrome.scripting.executeScript({ world: "MAIN" }) — runs the fill script
+ *     inside the page's own JS context so React/Vue/Angular synthetic events
+ *     are fired on the same prototype the framework patched.
+ *  2. renderBadges() — appends Shadow-DOM confidence pills (isolated world).
+ */
 async function injectAnswers(
-  answers: AnswerResult[]
+  answers:   AnswerResult[],
+  questions: ReturnType<typeof extractQuestions>
 ): Promise<{ errors: string[] }> {
-  // Task 5 will replace this with real DOM filling + confidence badges.
-  // For now, log the answers so they're visible in DevTools for manual testing.
-  console.log("[QuizFill content] injectAnswers() called — Task 5 not yet implemented.");
-  console.table(
-    answers.map((a) => ({
-      fieldId:    a.fieldId,
-      answer:     a.answer,
-      confidence: `${Math.round(a.confidence * 100)}%`,
-      reasoning:  a.reasoning ?? "",
-    }))
-  );
-  return { errors: [] };
+  const errors: string[] = [];
+
+  // Build fieldId → selector map
+  const selectorMap = new Map<string, string>();
+  for (const q of questions) {
+    if (q.selector) selectorMap.set(q.fieldId, q.selector);
+  }
+
+  // ── MAIN-world DOM filling ────────────────────────────────────────────
+  const injPayload = buildInjectorPayload(answers, selectorMap);
+  const script     = buildInjectorScript(injPayload);
+
+  try {
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) throw new Error("No active tab found.");
+
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      world:  "MAIN" as any,
+      // Pass the script string as a function body so Vite doesn't rewrite it
+      func:   new Function(`return (${script})()`) as () => unknown,
+    });
+
+    const outcome = results?.[0]?.result as Array<{
+      fieldId: string;
+      filled:  boolean;
+      reason:  string;
+    }> | undefined;
+
+    if (outcome) {
+      for (const item of outcome) {
+        if (!item.filled) {
+          const msg = `Could not fill "${item.fieldId}": ${item.reason}`;
+          console.warn("[QuizFill content]", msg);
+          errors.push(msg);
+        } else {
+          console.log(`[QuizFill content] ✓ Filled "${item.fieldId}"`);
+        }
+      }
+    }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[QuizFill content] MAIN-world injection failed:", msg);
+    errors.push(`Injection failed: ${msg}`);
+  }
+
+  // ── Confidence badges (Shadow DOM, isolated world) ────────────────────
+  try {
+    renderBadges(answers, questions);
+  } catch (err: unknown) {
+    // Non-fatal — filling may have succeeded even if badges fail
+    console.warn("[QuizFill content] Badge rendering failed:", err);
+  }
+
+  return { errors };
 }
 
 // ---------------------------------------------------------------------------
@@ -145,9 +196,9 @@ async function injectAnswers(
 function buildSummary(answers: AnswerResult[], errors: string[]): FillSummary {
   let high = 0, med = 0, low = 0;
   for (const a of answers) {
-    if (a.confidence >= 0.8)       high++;
-    else if (a.confidence >= 0.5)  med++;
-    else                           low++;
+    if (a.confidence >= 0.8)      high++;
+    else if (a.confidence >= 0.5) med++;
+    else                          low++;
   }
   return {
     totalFilled:    answers.length,
