@@ -1,21 +1,23 @@
 /**
- * Background Service Worker — Tasks 1 & 2
+ * Background Service Worker — Tasks 1, 2 & 3
  *
  * Central message hub. Only the service worker can make cross-origin fetch()
  * calls to OpenAI / Gemini (via host_permissions in the manifest).
  *
  * Handlers:
  *  - Task 2: TEST_CONNECTION — make a minimal API call to validate the key
- *  - Task 3: AI_COMPLETE     — route questions to OpenAI or Gemini (pending)
+ *  - Task 3: AI_COMPLETE     — route questions to OpenAI or Gemini, return answers
  *  - Task 6: FETCH_URL       — fetch a user-provided URL (pending)
  */
 
 import browser from "webextension-polyfill";
 import {
   MessageType,
+  type AiCompletePayload,
   type TestConnectionPayload,
   type TestConnectionResult,
 } from "../lib/types.js";
+import { handleAiComplete } from "../lib/llm/router.js";
 
 // ---------------------------------------------------------------------------
 // TEST_CONNECTION — validate the user-supplied API key
@@ -137,10 +139,11 @@ export default defineBackground(() => {
       console.log("[QuizFill background] Received message:", message.type);
 
       switch (message.type) {
-        case MessageType.AI_COMPLETE:
-          // Implemented in Task 3
-          sendResponse({ success: false, error: "AI_COMPLETE not yet implemented." });
-          break;
+        case MessageType.AI_COMPLETE: {
+          const payload = message as unknown as AiCompletePayload & { type: MessageType };
+          handleAiComplete(payload).then(sendResponse);
+          return true; // keep channel open for async response
+        }
 
         case MessageType.TEST_CONNECTION: {
           const payload = message as unknown as TestConnectionPayload & { type: MessageType };

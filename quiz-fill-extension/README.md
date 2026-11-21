@@ -142,7 +142,7 @@ quiz-fill-extension/
 |------|-------------|--------|
 | 1 | Project scaffold & dev environment | ✅ Done |
 | 2 | Options page — API key & provider | ✅ Done |
-| 3 | Background service worker — LLM router | 🔲 Pending |
+| 3 | Background service worker — LLM router | ✅ Done |
 | 4 | Content script — DOM question extractor | 🔲 Pending |
 | 5 | Content script — answer injector + badges | 🔲 Pending |
 | 6 | Resource manager — text, files, URLs | 🔲 Pending |
