@@ -12,11 +12,6 @@ export default defineConfig({
 
   extensionApi: "chrome",
 
-  // Use webextension-polyfill for cross-browser API compatibility
-  imports: {
-    addons: ["webextension-polyfill"],
-  },
-
   manifest: {
     name: "QuizFill",
     short_name: "QuizFill",

@@ -7,10 +7,10 @@
  */
 
 import browser from "webextension-polyfill";
-import type {
-  FillSummary,
-  LLMSettings,
+import {
   MessageType,
+  type FillSummary,
+  type LLMSettings,
 } from "../../lib/types.js";
 
 // ---------------------------------------------------------------------------
@@ -102,7 +102,7 @@ async function startFill(): Promise<void> {
     // The content script will handle DOM extraction → AI_COMPLETE → injection.
     setStatus("Extracting questions…");
     const response = await browser.tabs.sendMessage(tab.id, {
-      type: "FILL_PAGE" satisfies MessageType,
+      type: MessageType.FILL_PAGE,
       resourceContext,
     });
 

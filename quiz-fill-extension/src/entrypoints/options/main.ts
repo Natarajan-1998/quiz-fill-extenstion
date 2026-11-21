@@ -11,12 +11,12 @@
  */
 
 import browser from "webextension-polyfill";
-import type {
-  LLMProvider,
-  LLMSettings,
+import {
   MessageType,
-  TestConnectionPayload,
-  TestConnectionResult,
+  type LLMProvider,
+  type LLMSettings,
+  type TestConnectionPayload,
+  type TestConnectionResult,
 } from "../../lib/types.js";
 
 // ---------------------------------------------------------------------------
@@ -78,8 +78,8 @@ const apiKeyInput     = document.getElementById("api-key-input")     as HTMLInpu
 const keyHint         = document.getElementById("key-hint")          as HTMLParagraphElement;
 const keyError        = document.getElementById("key-error")         as HTMLParagraphElement;
 const toggleKeyVis    = document.getElementById("toggle-key-vis")    as HTMLButtonElement;
-const eyeOpen         = document.getElementById("eye-open")          as SVGElement;
-const eyeClosed       = document.getElementById("eye-closed")        as SVGElement;
+const eyeOpen         = document.getElementById("eye-open")          as HTMLElement;
+const eyeClosed       = document.getElementById("eye-closed")        as HTMLElement;
 const saveBtn         = document.getElementById("save-btn")          as HTMLButtonElement;
 const testBtn         = document.getElementById("test-btn")          as HTMLButtonElement;
 const savedBadge      = document.getElementById("saved-badge")       as HTMLSpanElement;
@@ -209,7 +209,7 @@ async function testConnection(): Promise<void> {
     };
 
     const result = (await browser.runtime.sendMessage({
-      type: "TEST_CONNECTION" satisfies MessageType,
+      type: MessageType.TEST_CONNECTION,
       ...payload,
     })) as TestConnectionResult;
 
