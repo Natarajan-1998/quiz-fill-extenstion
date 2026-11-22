@@ -39,7 +39,10 @@ import {
 async function parsePdf(buffer: ArrayBuffer): Promise<string> {
   const pdfjsLib = await import("pdfjs-dist");
   if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL("pdf.worker.min.mjs");
+    // The bundler emits the worker as a file inside the extension and gives
+    // back its path; the popup is an extension page, so it can load it.
+    const { default: workerUrl } = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
+    pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
   }
   const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
   const pages: string[] = [];

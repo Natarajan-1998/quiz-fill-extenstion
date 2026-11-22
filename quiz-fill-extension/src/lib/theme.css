@@ -73,8 +73,6 @@
   --kiro-tx: 0.15s ease;
 }
 
-/* Google Fonts — Inter (best effort; falls back to system sans if offline) */
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 
 /* ── Global reset ─────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }

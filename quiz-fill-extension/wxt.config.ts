@@ -7,8 +7,8 @@ export default defineConfig({
   // Output directory
   outDir: "dist",
 
-  // Build output naming: dist/chrome-mv3, dist/firefox-mv3
-  outDirTemplate: "{{browser}}-mv3",
+  // Build output naming: dist/chrome-mv3, dist/firefox-mv2
+  outDirTemplate: "{{browser}}-mv{{manifestVersion}}",
 
   extensionApi: "chrome",
 
@@ -31,26 +31,38 @@ export default defineConfig({
       "<all_urls>",
     ],
 
+    icons: {
+      16: "icons/16.png",
+      32: "icons/32.png",
+      48: "icons/48.png",
+      128: "icons/128.png",
+    },
+
     // Action (toolbar button)
     action: {
       default_popup: "popup.html",
       default_title: "QuizFill — Auto-fill this page",
+      default_icon: {
+        16: "icons/16.png",
+        32: "icons/32.png",
+        48: "icons/48.png",
+        128: "icons/128.png",
+      },
     },
 
     // Firefox-specific settings (ignored by Chrome)
     browser_specific_settings: {
+      // Cast: WXT's manifest types predate data_collection_permissions (Firefox 140+).
       gecko: {
         id: "quizfill@extension",
-        strict_min_version: "109.0",
-      },
+        // pdf.js runs as a module worker, which needs Firefox 114+ (115 is the ESR).
+        strict_min_version: "115.0",
+        // Shown to users at install. When the user clicks Fill, the page's
+        // question and option text is sent to the AI provider they configured.
+        data_collection_permissions: {
+          required: ["websiteContent"],
+        },
+      } as { id: string; strict_min_version: string },
     },
-
-    // The pdf.worker script must be accessible from content scripts
-    web_accessible_resources: [
-      {
-        resources: ["pdf.worker.min.mjs", "icons/*"],
-        matches: ["<all_urls>"],
-      },
-    ],
   },
 });
