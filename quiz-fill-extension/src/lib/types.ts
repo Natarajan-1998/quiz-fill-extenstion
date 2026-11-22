@@ -67,7 +67,8 @@ export interface ExtractedQuestion {
   /** Available choices for radio/checkbox/select fields */
   options?: SelectOption[];
 
-  /** CSS selector that uniquely identifies this element in the DOM */
+  /** Locator for this field (see locator.ts): a CSS selector, or a chain of hops
+   *  through same-origin iframes and open shadow roots joined by " >>> ". */
   selector?: string;
 }
 

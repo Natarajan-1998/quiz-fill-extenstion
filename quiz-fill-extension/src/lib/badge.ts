@@ -21,6 +21,7 @@
 
 import type { AnswerResult } from "./types.js";
 import type { ExtractedQuestion } from "./types.js";
+import { resolveElement } from "./locator.js";
 
 // ---------------------------------------------------------------------------
 // Badge colour helpers
@@ -44,10 +45,16 @@ const BADGE_COLORS: Record<ConfidenceLevel, { bg: string; text: string; border: 
 // Public API
 // ---------------------------------------------------------------------------
 
+/**
+ * Badges placed by the current run. Tracked here, not found by querying the
+ * document, because they may sit inside shadow roots or iframes.
+ */
+let placedBadges: Element[] = [];
+
 /** Remove any badges placed by a previous fill run. */
 export function clearBadges(): void {
-  const existing = document.querySelectorAll("[data-quizfill-badge]");
-  existing.forEach((el) => el.remove());
+  placedBadges.forEach((el) => el.remove());
+  placedBadges = [];
 }
 
 /**
@@ -85,25 +92,12 @@ export function renderBadges(
 // ---------------------------------------------------------------------------
 
 function resolveTarget(fieldId: string, selector?: string): HTMLElement | null {
-  // Try the stored CSS selector first
+  // The extractor's locator reaches into shadow roots and same-origin iframes.
   if (selector) {
-    try {
-      const el = document.querySelector<HTMLElement>(selector);
-      if (el) return el;
-    } catch (_) {}
+    const el = resolveElement(selector);
+    if (el) return el as HTMLElement;
   }
-
-  // Fallback: try id
-  const byId = document.getElementById(fieldId);
-  if (byId) return byId;
-
-  // Fallback: try name attribute
-  try {
-    const byName = document.querySelector<HTMLElement>(`[name="${CSS.escape(fieldId)}"]`);
-    if (byName) return byName;
-  } catch (_) {}
-
-  return null;
+  return document.getElementById(fieldId);
 }
 
 // ---------------------------------------------------------------------------
@@ -117,7 +111,8 @@ function placeBadge(anchor: HTMLElement, answer: AnswerResult): void {
   const icon   = level === "high" ? "✓" : level === "med" ? "~" : "?";
 
   // ── Create the host element ───────────────────────────────────────────
-  const host = document.createElement("span");
+  // Create the badge in the field's own document (it may be inside an iframe).
+  const host = anchor.ownerDocument.createElement("span");
   host.setAttribute("data-quizfill-badge", answer.fieldId);
   host.style.cssText = [
     "display:inline-flex",
@@ -215,6 +210,7 @@ function placeBadge(anchor: HTMLElement, answer: AnswerResult): void {
 
   // ── Insert badge after the target element ─────────────────────────────
   insertAfter(host, anchor);
+  placedBadges.push(host);
 }
 
 // ---------------------------------------------------------------------------
@@ -244,7 +240,8 @@ function buildTooltipText(answer: AnswerResult, level: ConfidenceLevel): string 
 
 function insertAfter(newEl: Element, ref: Element): void {
   // For radio/checkbox groups, insert after the last element in the group
-  const parent = ref.parentElement;
+  // parentNode, not parentElement: a field can be a direct child of a shadow root.
+  const parent = ref.parentNode;
   if (!parent) return;
 
   const next = ref.nextSibling;

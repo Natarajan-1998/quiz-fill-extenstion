@@ -129,9 +129,9 @@ quiz-fill-extension/
 
 ## Known Limitations
 
-- **Shadow DOM fields** — inputs inside closed Shadow DOM roots (some custom web components) are not detected.
-- **CSP-locked pages** — pages with a strict Content-Security-Policy that blocks script injection will prevent field filling. The extension will still extract and show questions but cannot write to the DOM.
-- **iFrame questions** — questions rendered inside cross-origin iframes cannot be read (browser security restriction).
+- **Shadow DOM** — fields inside open shadow roots are detected and filled. Closed shadow roots are not reachable from an extension.
+- **Iframes** — fields inside same-origin iframes are detected and filled (for example an LMS that loads its quiz in an iframe on the same site). Cross-origin iframes are skipped because the browser blocks access to them.
+- **CSP-locked pages** — pages with a strict Content-Security-Policy may block page-world injection; the extension then fills from the content script instead, which works for most fields.
 - **Image-based questions** — purely visual questions (e.g. images of text with no accessible text) are not extracted.
 
 ---
