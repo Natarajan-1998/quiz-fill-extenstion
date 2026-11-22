@@ -1,9 +1,11 @@
 /**
- * Options page — Task 2
+ * Options page — Task 2 (model list loaded from the provider)
  *
  * Handles:
  *  - Loading saved LLMSettings from chrome.storage.local on page load
- *  - Dynamically updating the model dropdown when provider changes
+ *  - Loading the list of usable models from the provider (LIST_MODELS) once an
+ *    API key is present, with a manual "Custom model name" fallback when the
+ *    list cannot be loaded or the saved model is no longer offered
  *  - Validating & saving settings via browser.storage.local.set()
  *  - Testing the API key via a TEST_CONNECTION message to the service worker
  *  - Show/hide API key toggle
@@ -15,50 +17,27 @@ import {
   MessageType,
   type LLMProvider,
   type LLMSettings,
+  type ListModelsResult,
+  type ModelInfo,
   type TestConnectionPayload,
   type TestConnectionResult,
 } from "../../lib/types.js";
 
 // ---------------------------------------------------------------------------
-// Model options per provider
+// Constants
 // ---------------------------------------------------------------------------
 
-const MODELS: Record<LLMProvider, Array<{ value: string; label: string; hint: string }>> = {
-  openai: [
-    {
-      value: "gpt-4o",
-      label: "GPT-4o",
-      hint: "Best accuracy. Recommended for most use cases.",
-    },
-    {
-      value: "gpt-4o-mini",
-      label: "GPT-4o mini",
-      hint: "Faster and cheaper. Good for simpler quizzes.",
-    },
-    {
-      value: "gpt-4-turbo",
-      label: "GPT-4 Turbo",
-      hint: "Older flagship model — use GPT-4o instead.",
-    },
-  ],
-  gemini: [
-    {
-      value: "gemini-1.5-flash",
-      label: "Gemini 1.5 Flash",
-      hint: "Fast and cost-effective. Recommended for most use cases.",
-    },
-    {
-      value: "gemini-1.5-pro",
-      label: "Gemini 1.5 Pro",
-      hint: "Higher accuracy, slower and more expensive.",
-    },
-    {
-      value: "gemini-2.0-flash",
-      label: "Gemini 2.0 Flash (exp)",
-      hint: "Experimental next-gen Flash model.",
-    },
-  ],
+/** Value of the last <option>, which switches the page to a free-text model field. */
+const CUSTOM = "__custom__";
+
+/** Only used as placeholder text. Not applied unless the user types it. */
+const EXAMPLE_MODEL: Record<LLMProvider, string> = {
+  openai: "gpt-4o",
+  gemini: "gemini-3.5-flash-lite",
 };
+
+/** Auto-refresh only fires for keys at least this long, to avoid requests while typing. */
+const MIN_KEY_LENGTH_FOR_AUTO_REFRESH = 20;
 
 const KEY_HINTS: Record<LLMProvider, string> = {
   openai:
@@ -71,56 +50,152 @@ const KEY_HINTS: Record<LLMProvider, string> = {
 // DOM references
 // ---------------------------------------------------------------------------
 
-const providerSelect  = document.getElementById("provider-select")  as HTMLSelectElement;
-const modelSelect     = document.getElementById("model-select")      as HTMLSelectElement;
-const modelHint       = document.getElementById("model-hint")        as HTMLParagraphElement;
-const apiKeyInput     = document.getElementById("api-key-input")     as HTMLInputElement;
-const keyHint         = document.getElementById("key-hint")          as HTMLParagraphElement;
-const keyError        = document.getElementById("key-error")         as HTMLParagraphElement;
-const toggleKeyVis    = document.getElementById("toggle-key-vis")    as HTMLButtonElement;
-const eyeOpen         = document.getElementById("eye-open")          as HTMLElement;
-const eyeClosed       = document.getElementById("eye-closed")        as HTMLElement;
-const saveBtn         = document.getElementById("save-btn")          as HTMLButtonElement;
-const testBtn         = document.getElementById("test-btn")          as HTMLButtonElement;
-const savedBadge      = document.getElementById("saved-badge")       as HTMLSpanElement;
-const toast           = document.getElementById("toast")             as HTMLDivElement;
-const toastText       = document.getElementById("toast-text")        as HTMLSpanElement;
-const toastSpinner    = document.getElementById("toast-spinner")     as HTMLDivElement;
-const clearDataBtn    = document.getElementById("clear-data-btn")    as HTMLButtonElement;
+const providerSelect   = document.getElementById("provider-select")     as HTMLSelectElement;
+const modelSelect      = document.getElementById("model-select")        as HTMLSelectElement;
+const modelCustomInput = document.getElementById("model-custom-input")  as HTMLInputElement;
+const modelHint        = document.getElementById("model-hint")          as HTMLParagraphElement;
+const modelError       = document.getElementById("model-error")         as HTMLParagraphElement;
+const refreshModelsBtn = document.getElementById("refresh-models-btn")  as HTMLButtonElement;
+const apiKeyInput      = document.getElementById("api-key-input")       as HTMLInputElement;
+const keyHint          = document.getElementById("key-hint")            as HTMLParagraphElement;
+const keyError         = document.getElementById("key-error")           as HTMLParagraphElement;
+const toggleKeyVis     = document.getElementById("toggle-key-vis")      as HTMLButtonElement;
+const eyeOpen          = document.getElementById("eye-open")            as HTMLElement;
+const eyeClosed        = document.getElementById("eye-closed")          as HTMLElement;
+const saveBtn          = document.getElementById("save-btn")            as HTMLButtonElement;
+const testBtn          = document.getElementById("test-btn")            as HTMLButtonElement;
+const savedBadge       = document.getElementById("saved-badge")         as HTMLSpanElement;
+const toast            = document.getElementById("toast")               as HTMLDivElement;
+const toastText        = document.getElementById("toast-text")          as HTMLSpanElement;
+const toastSpinner     = document.getElementById("toast-spinner")       as HTMLDivElement;
+const clearDataBtn     = document.getElementById("clear-data-btn")      as HTMLButtonElement;
 
 // ---------------------------------------------------------------------------
-// Helpers — model dropdown
+// Model dropdown
 // ---------------------------------------------------------------------------
 
-function populateModels(provider: LLMProvider, selectedModel?: string): void {
-  const options = MODELS[provider];
+/** Incremented on every refresh so a slow, older response cannot overwrite a newer one. */
+let loadSeq = 0;
+
+/** The model the user has chosen, from the dropdown or the free-text field. */
+function getSelectedModel(): string {
+  return modelSelect.value === CUSTOM ? modelCustomInput.value.trim() : modelSelect.value;
+}
+
+function setCustomMode(on: boolean, prefill?: string): void {
+  modelCustomInput.style.display = on ? "block" : "none";
+  if (prefill !== undefined) modelCustomInput.value = prefill;
+}
+
+function setModelHint(text: string): void {
+  // textContent, not innerHTML: error text can come from the network.
+  modelHint.textContent = text;
+}
+
+function appendCustomOption(): void {
+  const el = document.createElement("option");
+  el.value = CUSTOM;
+  el.textContent = "Custom model name…";
+  modelSelect.appendChild(el);
+}
+
+/** Fill the dropdown from the provider's list. Returns true if `wanted` was in the list. */
+function renderModelOptions(models: ModelInfo[], wanted?: string): boolean {
   modelSelect.innerHTML = "";
-
-  for (const opt of options) {
+  for (const m of models) {
     const el = document.createElement("option");
-    el.value = opt.value;
-    el.textContent = opt.label;
+    el.value = m.id;
+    el.textContent = m.label;
     modelSelect.appendChild(el);
   }
+  appendCustomOption();
 
-  // Restore previously selected model if it still exists for this provider
-  if (selectedModel) {
-    const exists = options.some((o) => o.value === selectedModel);
-    if (exists) modelSelect.value = selectedModel;
+  if (wanted && models.some((m) => m.id === wanted)) {
+    modelSelect.value = wanted;
+    setCustomMode(false);
+    return true;
   }
-
-  updateModelHint();
+  if (wanted) {
+    // Saved or typed model is not offered for this key: keep it visible and editable.
+    modelSelect.value = CUSTOM;
+    setCustomMode(true, wanted);
+    return false;
+  }
+  modelSelect.selectedIndex = 0;
+  setCustomMode(false);
+  return true;
 }
 
-function updateModelHint(): void {
+/** Fallback: no list available, so the user types a model name. */
+function renderManualEntry(provider: LLMProvider, wanted?: string): void {
+  modelSelect.innerHTML = "";
+  appendCustomOption();
+  modelSelect.value = CUSTOM;
+  modelCustomInput.placeholder = `e.g. ${EXAMPLE_MODEL[provider]}`;
+  setCustomMode(true, wanted ?? "");
+}
+
+/**
+ * Ask the provider which models this key can use and rebuild the dropdown.
+ * `wanted` is the model to keep selected if it is still offered.
+ */
+async function refreshModels(wanted?: string): Promise<void> {
   const provider = providerSelect.value as LLMProvider;
-  const model = modelSelect.value;
-  const found = MODELS[provider].find((m) => m.value === model);
-  modelHint.textContent = found?.hint ?? "";
+  const apiKey = apiKeyInput.value.trim();
+
+  if (!apiKey) {
+    renderManualEntry(provider, wanted);
+    setModelHint("Enter your API key to load the models available to it, or type a model name.");
+    return;
+  }
+
+  const seq = ++loadSeq;
+  refreshModelsBtn.disabled = true;
+  setModelHint("Loading available models…");
+
+  try {
+    const res = (await browser.runtime.sendMessage({
+      type: MessageType.LIST_MODELS,
+      provider,
+      apiKey,
+    })) as ListModelsResult;
+
+    if (seq !== loadSeq) return; // a newer request superseded this one
+
+    if (res.success && res.models) {
+      const found = renderModelOptions(res.models, wanted);
+      setModelHint(
+        found
+          ? `${res.models.length} models available for this key.`
+          : `"${wanted}" is not offered for this key (it may have been retired). Pick a model above or keep your own name.`
+      );
+    } else {
+      renderManualEntry(provider, wanted);
+      setModelHint(
+        `Could not load the model list: ${res.error ?? "unknown error"} Type a model name instead.`
+      );
+    }
+  } catch (err: unknown) {
+    if (seq !== loadSeq) return;
+    renderManualEntry(provider, wanted);
+    const msg = err instanceof Error ? err.message : String(err);
+    setModelHint(`Could not load the model list: ${msg} Type a model name instead.`);
+  } finally {
+    if (seq === loadSeq) refreshModelsBtn.disabled = false;
+  }
+}
+
+let keyDebounce: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleAutoRefresh(): void {
+  if (keyDebounce) clearTimeout(keyDebounce);
+  const key = apiKeyInput.value.trim();
+  if (key.length < MIN_KEY_LENGTH_FOR_AUTO_REFRESH) return;
+  keyDebounce = setTimeout(() => refreshModels(getSelectedModel() || undefined), 800);
 }
 
 // ---------------------------------------------------------------------------
-// Helpers — toast
+// Toast
 // ---------------------------------------------------------------------------
 
 type ToastKind = "loading" | "success" | "error";
@@ -137,7 +212,7 @@ function hideToast(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers — saved badge
+// Saved badge
 // ---------------------------------------------------------------------------
 
 let savedBadgeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -149,20 +224,29 @@ function flashSavedBadge(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers — validation
+// Validation
 // ---------------------------------------------------------------------------
 
 function validate(): boolean {
-  const key = apiKeyInput.value.trim();
+  let ok = true;
 
-  if (!key) {
+  if (!apiKeyInput.value.trim()) {
     keyError.classList.add("visible");
     apiKeyInput.focus();
-    return false;
+    ok = false;
+  } else {
+    keyError.classList.remove("visible");
   }
 
-  keyError.classList.remove("visible");
-  return true;
+  if (!getSelectedModel()) {
+    modelError.classList.add("visible");
+    if (ok) modelCustomInput.focus();
+    ok = false;
+  } else {
+    modelError.classList.remove("visible");
+  }
+
+  return ok;
 }
 
 // ---------------------------------------------------------------------------
@@ -177,14 +261,12 @@ async function saveSettings(): Promise<void> {
   const settings: LLMSettings = {
     provider: providerSelect.value as LLMProvider,
     apiKey: apiKeyInput.value.trim(),
-    model: modelSelect.value,
+    model: getSelectedModel(),
   };
 
   await browser.storage.local.set({ llmSettings: settings });
   flashSavedBadge();
   showToast("success", "Settings saved successfully.");
-
-  // Auto-hide the success toast after 3 s
   setTimeout(hideToast, 3000);
 }
 
@@ -205,7 +287,7 @@ async function testConnection(): Promise<void> {
     const payload: TestConnectionPayload = {
       provider: providerSelect.value as LLMProvider,
       apiKey: apiKeyInput.value.trim(),
-      model: modelSelect.value,
+      model: getSelectedModel(),
     };
 
     const result = (await browser.runtime.sendMessage({
@@ -213,11 +295,7 @@ async function testConnection(): Promise<void> {
       ...payload,
     })) as TestConnectionResult;
 
-    if (result.success) {
-      showToast("success", `✓ ${result.message}`);
-    } else {
-      showToast("error", `✗ ${result.message}`);
-    }
+    showToast(result.success ? "success" : "error", `${result.success ? "✓" : "✗"} ${result.message}`);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     showToast("error", `Connection failed: ${msg}`);
@@ -236,23 +314,16 @@ async function loadSettings(): Promise<void> {
   const saved = result.llmSettings as LLMSettings | undefined;
 
   if (!saved) {
-    // Fresh install — just populate defaults
-    populateModels("openai");
     keyHint.innerHTML = KEY_HINTS["openai"];
+    await refreshModels();
     return;
   }
 
-  // Restore provider
   providerSelect.value = saved.provider;
-
-  // Restore model (after populating the dropdown)
-  populateModels(saved.provider, saved.model);
-
-  // Restore API key (masked)
   apiKeyInput.value = saved.apiKey;
-
-  // Update hints
   keyHint.innerHTML = KEY_HINTS[saved.provider];
+
+  await refreshModels(saved.model);
 }
 
 // ---------------------------------------------------------------------------
@@ -267,14 +338,14 @@ async function clearAllData(): Promise<void> {
 
   await browser.storage.local.clear();
 
-  // Reset UI
   providerSelect.value = "openai";
-  populateModels("openai");
   apiKeyInput.value = "";
   keyHint.innerHTML = KEY_HINTS["openai"];
   keyError.classList.remove("visible");
+  modelError.classList.remove("visible");
   savedBadge.classList.remove("visible");
   hideToast();
+  await refreshModels();
 
   showToast("success", "All settings cleared.");
   setTimeout(hideToast, 3000);
@@ -285,30 +356,45 @@ async function clearAllData(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 document.addEventListener("DOMContentLoaded", async () => {
-  // Load saved settings first
   await loadSettings();
 
-  // Provider change → rebuild model dropdown + update hint
+  // Provider change → the old list does not apply, reload for the new provider
   providerSelect.addEventListener("change", () => {
     const provider = providerSelect.value as LLMProvider;
-    populateModels(provider);
     keyHint.innerHTML = KEY_HINTS[provider];
     keyError.classList.remove("visible");
+    modelError.classList.remove("visible");
     hideToast();
+    savedBadge.classList.remove("visible");
+    refreshModels();
+  });
+
+  // Model dropdown: reveal the text field for "Custom model name…"
+  modelSelect.addEventListener("change", () => {
+    const custom = modelSelect.value === CUSTOM;
+    setCustomMode(custom);
+    modelError.classList.remove("visible");
+    if (custom) {
+      modelCustomInput.placeholder = `e.g. ${EXAMPLE_MODEL[providerSelect.value as LLMProvider]}`;
+      modelCustomInput.focus();
+    }
+  });
+
+  modelCustomInput.addEventListener("input", () => {
+    if (modelCustomInput.value.trim()) modelError.classList.remove("visible");
     savedBadge.classList.remove("visible");
   });
 
-  // Model change → update hint
-  modelSelect.addEventListener("change", updateModelHint);
+  refreshModelsBtn.addEventListener("click", () => refreshModels(getSelectedModel() || undefined));
 
-  // Clear error on key input
+  // API key input: clear errors, then reload models once the key looks complete
   apiKeyInput.addEventListener("input", () => {
     if (apiKeyInput.value.trim()) keyError.classList.remove("visible");
     hideToast();
     savedBadge.classList.remove("visible");
+    scheduleAutoRefresh();
   });
 
-  // Show/hide API key
   toggleKeyVis.addEventListener("click", () => {
     const isHidden = apiKeyInput.type === "password";
     apiKeyInput.type = isHidden ? "text" : "password";
@@ -316,16 +402,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     eyeClosed.style.display = isHidden ? "block" : "none";
   });
 
-  // Save
   saveBtn.addEventListener("click", saveSettings);
-
-  // Test
   testBtn.addEventListener("click", testConnection);
-
-  // Clear all
   clearDataBtn.addEventListener("click", clearAllData);
 
-  // Allow Enter key in API key field to save
   apiKeyInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") saveSettings();
   });

@@ -20,6 +20,9 @@ export enum MessageType {
   /** Popup → Background: fetch a URL and return its plain-text content */
   FETCH_URL = "FETCH_URL",
 
+  /** Options → Background: ask the provider which models this key can use */
+  LIST_MODELS = "LIST_MODELS",
+
   /** Background → Popup/Content Script: stream a status update */
   STATUS_UPDATE = "STATUS_UPDATE",
 }
@@ -148,6 +151,24 @@ export interface TestConnectionPayload {
 export interface TestConnectionResult {
   success: boolean;
   message: string;
+}
+
+export interface ModelInfo {
+  /** Model id sent in API requests, e.g. "gpt-4o" */
+  id: string;
+  /** Human-readable name shown in the dropdown */
+  label: string;
+}
+
+export interface ListModelsPayload {
+  provider: LLMProvider;
+  apiKey: string;
+}
+
+export interface ListModelsResult {
+  success: boolean;
+  models?: ModelInfo[];
+  error?: string;
 }
 
 export interface FetchUrlPayload {

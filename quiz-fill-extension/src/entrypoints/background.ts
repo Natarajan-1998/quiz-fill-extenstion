@@ -16,10 +16,12 @@ import {
   type AiCompletePayload,
   type FetchUrlPayload,
   type FetchUrlResult,
+  type ListModelsPayload,
   type TestConnectionPayload,
   type TestConnectionResult,
 } from "../lib/types.js";
 import { handleAiComplete } from "../lib/llm/router.js";
+import { listModels } from "../lib/llm/models.js";
 
 // ---------------------------------------------------------------------------
 // FETCH_URL — fetch a user-provided URL and return its raw text/HTML
@@ -161,6 +163,12 @@ async function testGemini(apiKey: string, model: string): Promise<TestConnection
     }
     return { success: false, message: `Gemini error 400: ${detail}` };
   }
+  if (res.status === 404) {
+    return {
+      success: false,
+      message: `Model "${model}" was not found. It may have been retired. Pick another model from the list.`,
+    };
+  }
   if (res.status === 429) {
     return { success: true, message: "Key is valid (rate-limited — quota may be low)." };
   }
@@ -206,6 +214,12 @@ export default defineBackground(() => {
           const payload = message as unknown as TestConnectionPayload & { type: MessageType };
           handleTestConnection(payload).then(sendResponse);
           return true; // keep channel open for async response
+        }
+
+        case MessageType.LIST_MODELS: {
+          const payload = message as unknown as ListModelsPayload & { type: MessageType };
+          listModels(payload.provider, payload.apiKey).then(sendResponse);
+          return true;
         }
 
         case MessageType.FETCH_URL: {
