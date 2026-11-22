@@ -185,7 +185,8 @@ function classifyError(msg: string): string {
     return `Invalid API key. <a id="err-settings-link">Update it in Settings →</a>`;
   }
   if (m.includes("rate limit") || m.includes("429") || m.includes("quota")) {
-    return "Rate limit reached. Wait a moment and try again, or check your API quota.";
+    // Pass the provider's message through; it says which limit was hit.
+    return escHtml(msg.length > 400 ? msg.slice(0, 400) + "…" : msg);
   }
   if (m.includes("could not establish connection") || m.includes("receiving end does not exist")) {
     return "QuizFill can't run on this page (browser system page or empty tab).";
@@ -197,7 +198,7 @@ function classifyError(msg: string): string {
     return "Could not access the active tab. Try closing and reopening the extension.";
   }
   // Generic fallback — show the raw message but cap its length
-  return msg.length > 160 ? msg.slice(0, 160) + "…" : msg;
+  return escHtml(msg.length > 160 ? msg.slice(0, 160) + "…" : msg);
 }
 
 // ---------------------------------------------------------------------------

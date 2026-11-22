@@ -61,9 +61,8 @@ export async function callOpenAI(
       throw new Error("Invalid OpenAI API key. Update it in Settings.");
     }
     if (res.status === 429) {
-      throw new Error(
-        "OpenAI rate limit reached. Wait a moment and try again, or check your usage quota."
-      );
+      // Keep OpenAI's own message: it distinguishes rate limits from exhausted credit.
+      throw new Error(`OpenAI rate limit or quota error (429) for model "${model}": ${detail.slice(0, 300)}`);
     }
     if (res.status === 400) {
       throw new Error(`OpenAI bad request: ${detail}`);

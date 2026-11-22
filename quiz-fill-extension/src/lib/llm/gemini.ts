@@ -77,9 +77,8 @@ export async function callGemini(
       throw new Error(`Gemini bad request: ${detail}`);
     }
     if (res.status === 429) {
-      throw new Error(
-        "Gemini rate limit reached. Wait a moment and try again, or check your quota."
-      );
+      // Keep Google's own message: it names the exceeded quota and retry delay.
+      throw new Error(`Gemini rate limit or quota error (429) for model "${model}": ${detail.slice(0, 300)}`);
     }
     if (res.status === 404) {
       throw new Error(
