@@ -15,7 +15,7 @@
  */
 
 import type { AnswerResult, ExtractedQuestion } from "../types.js";
-import { buildSystemPrompt, buildUserPrompt, parseAnswers } from "./prompt.js";
+import { buildSystemPrompt, buildUserPrompt, outputTokenBudget, parseAnswers } from "./prompt.js";
 
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
@@ -45,7 +45,7 @@ export async function callGemini(
     ],
     generationConfig: {
       temperature: 0.1,
-      maxOutputTokens: 2048,
+      maxOutputTokens: outputTokenBudget(questions.length),
       // Tell Gemini to respond with valid JSON
       responseMimeType: "application/json",
     },
@@ -111,5 +111,12 @@ export async function callGemini(
     `completion: ${data.usageMetadata?.candidatesTokenCount ?? "?"}`
   );
 
-  return parseAnswers(rawContent, questions);
+  try {
+    return parseAnswers(rawContent, questions);
+  } catch (err) {
+    if (finishReason === "MAX_TOKENS") {
+      throw new Error("The AI's reply was cut off before it finished. Try a page with fewer fields.");
+    }
+    throw err;
+  }
 }

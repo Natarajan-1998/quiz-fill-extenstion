@@ -22,6 +22,48 @@ import {
 } from "../lib/types.js";
 import { handleAiComplete } from "../lib/llm/router.js";
 import { listModels } from "../lib/llm/models.js";
+import { fillFields, type FillOutcome, type InjectorPayload } from "../lib/injector.js";
+
+// ---------------------------------------------------------------------------
+// INJECT_ANSWERS — run the fill function inside the page (MAIN world)
+//
+// Content scripts cannot use chrome.tabs / chrome.scripting, so they ask the
+// service worker to do it. The tab comes from the message sender, not from a
+// "current tab" query, so the right page is filled even if focus has moved.
+// ---------------------------------------------------------------------------
+
+type InjectResult =
+  | { success: true; outcomes: FillOutcome[] }
+  | { success: false; unsupported?: boolean; error: string };
+
+async function handleInjectAnswers(
+  payload: InjectorPayload,
+  sender: browser.Runtime.MessageSender
+): Promise<InjectResult> {
+  const tabId = sender.tab?.id;
+  if (tabId === undefined) {
+    return { success: false, error: "Message did not come from a tab." };
+  }
+
+  // Firefox's MV2 build has no chrome.scripting; the content script then fills directly.
+  if (typeof chrome === "undefined" || !chrome.scripting?.executeScript) {
+    return { success: false, unsupported: true, error: "scripting API unavailable." };
+  }
+
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId, frameIds: [sender.frameId ?? 0] },
+      world: "MAIN",
+      func: fillFields,
+      args: [payload],
+    });
+    const outcomes = results?.[0]?.result as FillOutcome[] | undefined;
+    if (!outcomes) return { success: false, error: "The page returned no fill result." };
+    return { success: true, outcomes };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
 
 // ---------------------------------------------------------------------------
 // FETCH_URL — fetch a user-provided URL and return its raw text/HTML
@@ -214,6 +256,12 @@ export default defineBackground(() => {
           const payload = message as unknown as TestConnectionPayload & { type: MessageType };
           handleTestConnection(payload).then(sendResponse);
           return true; // keep channel open for async response
+        }
+
+        case MessageType.INJECT_ANSWERS: {
+          const payload = (message as unknown as { payload: InjectorPayload }).payload;
+          handleInjectAnswers(payload, _sender).then(sendResponse);
+          return true;
         }
 
         case MessageType.LIST_MODELS: {

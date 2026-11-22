@@ -20,6 +20,9 @@ export enum MessageType {
   /** Popup → Background: fetch a URL and return its plain-text content */
   FETCH_URL = "FETCH_URL",
 
+  /** Content Script → Background: run the fill function inside the page (MAIN world) */
+  INJECT_ANSWERS = "INJECT_ANSWERS",
+
   /** Options → Background: ask the provider which models this key can use */
   LIST_MODELS = "LIST_MODELS",
 

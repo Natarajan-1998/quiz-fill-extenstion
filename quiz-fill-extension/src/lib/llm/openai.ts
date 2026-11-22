@@ -8,7 +8,7 @@
  */
 
 import type { AnswerResult, ExtractedQuestion } from "../types.js";
-import { buildSystemPrompt, buildUserPrompt, parseAnswers } from "./prompt.js";
+import { buildSystemPrompt, buildUserPrompt, outputTokenBudget, parseAnswers } from "./prompt.js";
 
 const OPENAI_ENDPOINT = "https://api.openai.com/v1/chat/completions";
 
@@ -30,7 +30,7 @@ export async function callOpenAI(
       { role: "user",   content: userPrompt   },
     ],
     temperature: 0.1,   // low temperature — deterministic answers preferred
-    max_tokens: 2048,
+    max_tokens: outputTokenBudget(questions.length),
     // Ask OpenAI to return valid JSON — supported on gpt-4o and gpt-4-turbo
     response_format: { type: "json_object" },
   };
@@ -92,5 +92,12 @@ export async function callOpenAI(
     `completion: ${data.usage?.completion_tokens ?? "?"}`
   );
 
-  return parseAnswers(rawContent, questions);
+  try {
+    return parseAnswers(rawContent, questions);
+  } catch (err) {
+    if (finishReason === "length") {
+      throw new Error("The AI's reply was cut off before it finished. Try a page with fewer fields.");
+    }
+    throw err;
+  }
 }

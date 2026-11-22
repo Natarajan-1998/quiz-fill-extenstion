@@ -112,8 +112,8 @@ interface RawResponse {
  *  - Markdown-fenced    ```json ... ```
  *  - Partial / truncated JSON (best-effort — returns whatever parsed cleanly)
  *
- * Unknown fieldIds are silently dropped. Missing answers for known questions
- * are filled with an empty string and confidence 0.
+ * Throws if the reply is not usable JSON at all. Unknown fieldIds are dropped.
+ * Missing answers for known questions get an empty string and confidence 0.
  */
 export function parseAnswers(
   rawContent: string,
@@ -135,7 +135,7 @@ export function parseAnswers(
     parsed = tryRepairJson(text);
     if (!parsed) {
       console.error("[QuizFill/prompt] Failed to parse LLM response:", text.slice(0, 300));
-      return fallbackEmpty(questions);
+      throw new Error("The AI's reply could not be read as JSON.");
     }
   }
 
@@ -153,7 +153,7 @@ export function parseAnswers(
     rawAnswers = (parsed as RawResponse).answers!;
   } else {
     console.error("[QuizFill/prompt] Unexpected response shape:", parsed);
-    return fallbackEmpty(questions);
+    throw new Error("The AI's reply was not in the expected format.");
   }
 
   // ── 4. Build result map ───────────────────────────────────────────────
@@ -212,12 +212,7 @@ function tryRepairJson(text: string): unknown | null {
   }
 }
 
-/** Return zero-confidence empty answers for every question. */
-function fallbackEmpty(questions: ExtractedQuestion[]): AnswerResult[] {
-  return questions.map((q) => ({
-    fieldId:    q.fieldId,
-    answer:     "",
-    confidence: 0,
-    reasoning:  "LLM response could not be parsed.",
-  }));
+/** Output-token budget that grows with the number of questions (capped). */
+export function outputTokenBudget(questionCount: number): number {
+  return Math.min(8192, 1024 + 200 * questionCount);
 }

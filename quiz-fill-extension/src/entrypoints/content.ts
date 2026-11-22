@@ -23,7 +23,7 @@ import {
   type FillSummary,
 } from "../lib/types.js";
 import { extractQuestions } from "../lib/extractor.js";
-import { buildInjectorScript, buildInjectorPayload } from "../lib/injector.js";
+import { buildInjectorPayload, fillFields, type FillOutcome } from "../lib/injector.js";
 import { renderBadges, clearBadges } from "../lib/badge.js";
 
 // ---------------------------------------------------------------------------
@@ -113,95 +113,91 @@ async function handleFillPage(resourceContext?: string): Promise<{
   const fillResult = await injectAnswers(answers, questions);
 
   // ── Step 4: Build and return summary ──────────────────────────────────
-  return { success: true, summary: buildSummary(answers, fillResult.errors) };
+  return { success: true, summary: buildSummary(fillResult.filled, fillResult.errors) };
 }
 
 // ---------------------------------------------------------------------------
-// Answer injector — Task 5 (full implementation)
+// Answer injector
 // ---------------------------------------------------------------------------
 
 /**
- * Two-step process:
- *  1. chrome.scripting.executeScript({ world: "MAIN" }) — runs the fill script
- *     inside the page's own JS context so React/Vue/Angular synthetic events
- *     are fired on the same prototype the framework patched.
- *  2. renderBadges() — appends Shadow-DOM confidence pills (isolated world).
+ * Fill the page, then place confidence badges on the fields that were filled.
+ *
+ * Content scripts have no chrome.tabs / chrome.scripting, so the fill runs via
+ * the background worker (which injects it into the page's MAIN world). If that
+ * is unavailable (Firefox MV2) or fails, the same function runs here directly.
  */
 async function injectAnswers(
   answers:   AnswerResult[],
   questions: ReturnType<typeof extractQuestions>
-): Promise<{ errors: string[] }> {
-  const errors: string[] = [];
-
-  // Build fieldId → selector map
+): Promise<{ errors: string[]; filled: AnswerResult[] }> {
   const selectorMap = new Map<string, string>();
   for (const q of questions) {
     if (q.selector) selectorMap.set(q.fieldId, q.selector);
   }
+  const payload = buildInjectorPayload(answers, selectorMap);
 
-  // ── MAIN-world DOM filling ────────────────────────────────────────────
-  const injPayload = buildInjectorPayload(answers, selectorMap);
-  const script     = buildInjectorScript(injPayload);
+  let outcomes: FillOutcome[] | null = null;
 
   try {
-    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.id) throw new Error("No active tab found.");
+    const res = (await browser.runtime.sendMessage({
+      type: MessageType.INJECT_ANSWERS,
+      payload,
+    })) as { success: boolean; outcomes?: FillOutcome[]; error?: string } | undefined;
 
-    const results = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      world:  "MAIN" as any,
-      // Pass the script string as a function body so Vite doesn't rewrite it
-      func:   new Function(`return (${script})()`) as () => unknown,
-    });
-
-    const outcome = results?.[0]?.result as Array<{
-      fieldId: string;
-      filled:  boolean;
-      reason:  string;
-    }> | undefined;
-
-    if (outcome) {
-      for (const item of outcome) {
-        if (!item.filled) {
-          const msg = `Could not fill "${item.fieldId}": ${item.reason}`;
-          console.warn("[QuizFill content]", msg);
-          errors.push(msg);
-        } else {
-          console.log(`[QuizFill content] ✓ Filled "${item.fieldId}"`);
-        }
-      }
+    if (res?.success && res.outcomes) {
+      outcomes = res.outcomes;
+    } else {
+      console.warn("[QuizFill content] Page-world fill unavailable, filling directly:", res?.error);
     }
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error("[QuizFill content] MAIN-world injection failed:", msg);
-    errors.push(`Injection failed: ${msg}`);
+    console.warn("[QuizFill content] Page-world fill failed, filling directly:", err);
   }
 
-  // ── Confidence badges (Shadow DOM, isolated world) ────────────────────
+  if (!outcomes) {
+    try {
+      outcomes = fillFields(payload);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[QuizFill content] Direct fill failed:", msg);
+      return { errors: [`Fill failed: ${msg}`], filled: [] };
+    }
+  }
+
+  const filledIds = new Set<string>();
+  const errors: string[] = [];
+  for (const o of outcomes) {
+    if (o.filled) {
+      filledIds.add(o.fieldId);
+    } else {
+      errors.push(`"${o.fieldId}": ${o.reason}`);
+    }
+  }
+
+  const filled = answers.filter((a) => filledIds.has(a.fieldId));
+
   try {
-    renderBadges(answers, questions);
+    renderBadges(filled, questions);
   } catch (err: unknown) {
-    // Non-fatal — filling may have succeeded even if badges fail
     console.warn("[QuizFill content] Badge rendering failed:", err);
   }
 
-  return { errors };
+  return { errors, filled };
 }
 
 // ---------------------------------------------------------------------------
-// Summary builder
+// Summary builder (counts only fields that were actually filled)
 // ---------------------------------------------------------------------------
 
-function buildSummary(answers: AnswerResult[], errors: string[]): FillSummary {
+function buildSummary(filled: AnswerResult[], errors: string[]): FillSummary {
   let high = 0, med = 0, low = 0;
-  for (const a of answers) {
+  for (const a of filled) {
     if (a.confidence >= 0.8)      high++;
     else if (a.confidence >= 0.5) med++;
     else                          low++;
   }
   return {
-    totalFilled:    answers.length,
+    totalFilled:    filled.length,
     highConfidence: high,
     medConfidence:  med,
     lowConfidence:  low,
