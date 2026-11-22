@@ -1,5 +1,7 @@
 # ── Build output ──────────────────────────────────────────────
-dist/
+# Build output is committed (dist/chrome-mv3, dist/firefox-mv2, release zips).
+# Stale build from before the Firefox folder was renamed to firefox-mv2:
+dist/firefox-mv3/
 
 # ── WXT generated types (regenerated on every dev/build run) ──
 .wxt/
