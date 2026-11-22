@@ -120,6 +120,7 @@ export function parseAnswers(
   questions: ExtractedQuestion[]
 ): AnswerResult[] {
   const knownIds = new Set(questions.map((q) => q.fieldId));
+  const questionById = new Map(questions.map((q) => [q.fieldId, q]));
 
   // ── 1. Strip markdown fences ─────────────────────────────────────────
   let text = rawContent.trim();
@@ -169,7 +170,12 @@ export function parseAnswers(
 
     if (!fieldId || !knownIds.has(fieldId)) continue; // ignore unknown ids
 
-    resultMap.set(fieldId, { fieldId, answer, confidence, reasoning });
+    resultMap.set(fieldId, {
+      fieldId,
+      answer: normaliseChoice(answer, questionById.get(fieldId)),
+      confidence,
+      reasoning,
+    });
   }
 
   // ── 5. Ensure every question has an entry (fill gaps with empty) ──────
@@ -191,6 +197,24 @@ export function parseAnswers(
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * For radio and select questions the fill step matches on the option's value
+ * (an opaque id on many sites). Models sometimes answer with the option's
+ * visible text instead, so map that back to the value.
+ */
+function normaliseChoice(answer: string, q: ExtractedQuestion | undefined): string {
+  if (!q?.options || (q.type !== "radio" && q.type !== "select")) return answer;
+
+  const norm = (v: string): string => v.trim().toLowerCase().replace(/\s+/g, " ");
+  const wanted = norm(answer);
+
+  const byValue = q.options.find((o) => norm(o.value) === wanted);
+  if (byValue) return byValue.value;
+
+  const byLabel = q.options.find((o) => norm(o.label) === wanted);
+  return byLabel ? byLabel.value : answer;
+}
 
 /** Attempt to close truncated JSON by counting brackets. */
 function tryRepairJson(text: string): unknown | null {

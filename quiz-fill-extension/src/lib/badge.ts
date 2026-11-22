@@ -76,6 +76,8 @@ export function renderBadges(
     if (q.selector) selectorMap.set(q.fieldId, q.selector);
   }
 
+  const questionById = new Map(questions.map((q) => [q.fieldId, q]));
+
   for (const answer of answers) {
     if (!answer.answer) continue; // skip unfilled fields
 
@@ -83,7 +85,11 @@ export function renderBadges(
     const target   = resolveTarget(answer.fieldId, selector);
     if (!target) continue;
 
-    placeBadge(target, answer);
+    // Show the option's text, not its internal value (which can be an opaque id).
+    const q = questionById.get(answer.fieldId);
+    const shown = q?.options?.find((o) => o.value === answer.answer)?.label ?? answer.answer;
+
+    placeBadge(target, answer, shown);
   }
 }
 
@@ -104,7 +110,7 @@ function resolveTarget(fieldId: string, selector?: string): HTMLElement | null {
 // Badge placement
 // ---------------------------------------------------------------------------
 
-function placeBadge(anchor: HTMLElement, answer: AnswerResult): void {
+function placeBadge(anchor: HTMLElement, answer: AnswerResult, shown: string): void {
   const level  = confidenceLevel(answer.confidence);
   const colors = BADGE_COLORS[level];
   const pct    = Math.round(answer.confidence * 100);
@@ -203,7 +209,7 @@ function placeBadge(anchor: HTMLElement, answer: AnswerResult): void {
         <span>${pct}%</span>
       </div>
       <div class="tooltip">
-        ${buildTooltipText(answer, level)}
+        ${buildTooltipText(answer, level, shown)}
       </div>
     </div>
   `;
@@ -217,14 +223,14 @@ function placeBadge(anchor: HTMLElement, answer: AnswerResult): void {
 // Tooltip text
 // ---------------------------------------------------------------------------
 
-function buildTooltipText(answer: AnswerResult, level: ConfidenceLevel): string {
+function buildTooltipText(answer: AnswerResult, level: ConfidenceLevel, shown: string): string {
   const pct  = Math.round(answer.confidence * 100);
   const label = level === "high" ? "High confidence"
               : level === "med"  ? "Medium confidence"
               :                    "Low confidence";
 
   const filled = answer.answer
-    ? `Filled: <strong>${escapeHtml(answer.answer.slice(0, 50))}</strong>`
+    ? `Filled: <strong>${escapeHtml(shown.slice(0, 80))}</strong>`
     : "Not filled";
 
   const reasoning = answer.reasoning
